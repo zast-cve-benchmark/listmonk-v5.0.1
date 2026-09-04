@@ -1,0 +1,8 @@
+.env
+
+# zast audit intermediate result files
+.zast/llm-auditor
+.zast/verifier
+.zast_share/
+.claude/
+CLAUDE.md

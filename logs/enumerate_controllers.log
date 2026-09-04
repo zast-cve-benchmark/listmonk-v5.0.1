@@ -1,0 +1,1472 @@
+2026-04-07 16:24:59.972 | INFO     | llm_auditor.utils.logger:__aenter__:53 - Session started
+2026-04-07 16:24:59.972 | INFO     | llm_auditor.tasks.enumerate_controllers:_enumerate_controllers:65 - Starting controller enumeration
+2026-04-07 16:25:02.431 | INFO     | langchain_zast.agents.claude.agent:_log:249 - {
+  "subtype": "init",
+  "data": {
+    "type": "system",
+    "subtype": "init",
+    "cwd": "D:\\cvedetails\\google-osv-api-go\\go_sinks\\sources\\CWE-1336\\CVE-2025-49136",
+    "session_id": "08ef33fa-95ed-49b9-b0f8-3170d583cfd1",
+    "tools": [
+      "Bash",
+      "Glob",
+      "Grep",
+      "Read",
+      "Edit",
+      "Write",
+      "TodoWrite",
+      "Skill",
+      "ExitWorktree",
+      "SendMessage",
+      "TeamCreate",
+      "TeamDelete",
+      "CronCreate",
+      "CronDelete",
+      "CronList"
+    ],
+    "mcp_servers": [],
+    "model": "qwen3-coder",
+    "permissionMode": "default",
+    "slash_commands": [
+      "update-config",
+      "debug",
+      "simplify",
+      "batch",
+      "loop",
+      "claude-api",
+      "craft-poc",
+      "enumerate-controllers",
+      "go-sink-extraction",
+      "compact",
+      "context",
+      "cost",
+      "heapdump",
+      "init",
+      "pr-comments",
+      "release-notes",
+      "review",
+      "security-review",
+      "insights"
+    ],
+    "apiKeySource": "none",
+    "claude_code_version": "2.1.81",
+    "output_style": "default",
+    "agents": [
+      "general-purpose",
+      "statusline-setup",
+      "Explore",
+      "Plan"
+    ],
+    "skills": [
+      "update-config",
+      "debug",
+      "simplify",
+      "batch",
+      "loop",
+      "claude-api",
+      "craft-poc",
+      "enumerate-controllers",
+      "go-sink-extraction",
+      "go-sink-extraction"
+    ],
+    "plugins": [],
+    "uuid": "41f5d9a4-c59f-44d9-9f7f-02f91d7209f5",
+    "fast_mode_state": "off"
+  }
+}
+2026-04-07 16:25:05.096 | Agent    | langchain_zast.agents.claude.agent:_log:249 - <think>The user wants me to use the `enumerate-controllers` skill to enumerate all API endpoints and controllers in the project, and save the output to a specific JSON file.
+
+Let me invoke the skill first.
+</think>
+
+
+
+2026-04-07 16:25:05.368 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Skill
+Args: {
+  "skill": "enumerate-controllers"
+}
+2026-04-07 16:25:05.419 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: Launching skill: enumerate-controllers
+isError: None
+2026-04-07 16:25:05.421 | User     | langchain_zast.agents.claude.agent:_log:249 - Base directory for this skill: D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\.claude\skills\enumerate-controllers
+
+# Enumerate Controllers
+
+## Task
+
+Traverse the codebase to extract all API endpoints and the definition locations of their corresponding controller methods. 
+Save the results to a file (`CONTROLLER_SOURCES_FILE`) at a location specified by the user.
+
+---
+
+### Task Results
+
+The data structure of the result file is `List[WebControllerSource]`. The relevant data classes are defined as follows:
+
+```python
+class Region(BaseModel):
+    file_path: str    # Relative path using '/' as seperator(e.g., "src/api/users.py")
+    start_line: int   # Start Line number (1-based)
+    end_line: int     # End Line number (1-based)
+
+class WebControllerSource(BaseModel):
+    endpoint: str     # API endpoint (e.g., "/api/users")
+    method: str       # HTTP method (e.g., 'GET', 'POST', ...)
+    protocol: str     # Protocol type (e.g., 'http', 'websocket', ...)
+    region: Region    # Definition location of the controller method
+```
+
+**Default Behavior:** If the user does not specify a storage location, save CONTROLLER_SOURCES_FILE by default to `./controller_sources.json` in the current working directory.
+
+---
+
+## Workflow
+
+### Identify the programming language and framework
+
+Check dependency files to identify framework:
+
+| Language      | File                                 | Framework                |
+|---------------|--------------------------------------|--------------------------|
+| Python        | `requirements.txt`, `pyproject.toml` | Flask, FastAPI, Django   |
+| JavaScript/TS | `package.json`                       | Express, NestJS, Next.js |
+| Java          | `pom.xml`, `build.gradle`            | Spring, JAX-RS           |
+| Go            | `go.mod`                             | Gin, Echo                |
+
+### Consult Framework References
+
+Once the framework is identified, read the relevant knowledge documentation to understand how routes and controllers are defined in this specific environment.
+
+#### Python
+
+- [Flask](references/python/flask.md) - Route decorators, Blueprints
+- [FastAPI](references/python/fastapi.md) - Decorators, APIRouter
+- [Django](references/python/django.md) - Views, ViewSets
+- [Tornado](references/python/tornado.md) - RequestHandler classes
+
+#### Java
+
+- [Spring Boot](references/java/spring.md) - Annotations, mappings
+- [JAX-RS](references/java/jaxrs.md) - Path annotations
+
+#### JavaScript/TypeScript
+
+- [Express](references/javascript/express.md) - Router methods
+- [NestJS](references/javascript/nestjs.md) - Controllers, decorators
+- [Next.js](references/javascript/nextjs.md) - App Router, Pages Router
+
+#### Go
+
+- [Gin](references/go/gin.md) - Router groups
+- [Echo](references/go/echo.md) - Route registration
+
+
+### Traverse Codebase and Track Progress
+
+Begin traversing the codebase to enumerate the API endpoints.
+
+*DO NOT* wait until you have read the entire codebase to summarize the results. You *MUST* strictly manage your state:
+
+- Create and continuously update a progress file named `enumerate_controllers_progress.md`.
+- Track the list of directories/files you have already reviewed and the other you still need to review.
+- Extract endpoints and update CONTROLLER_SOURCES_FILE incrementally.
+
+#### Incremental Updates and Validation
+
+Every time you discover a new endpoint:
+
+1. Immediately append it to the CONTROLLER_SOURCES_FILE.
+
+2. Run the validation script to ensure your data structure remains correct:
+
+```bash
+python scripts/validate_controller_sources.py /path/to/CONTROLLER_SOURCES_FILE
+```
+
+If validation fails, immediately correct the JSON formatting or data types before proceeding to the next file.
+
+---
+
+### Finalize and Report
+
+Ensure you have thoroughly traversed the entire codebase according to your progress file. Once complete, report back to the user with:
+
+1. The total count of extracted endpoints.
+2. The final absolute storage path of the CONTROLLER_SOURCES_FILE.
+
+## Important Rules
+
+1. **Incremental Updates**: Never generate entire output at once. Update JSON incrementally.
+2. **Validate Frequently**: Run validation script after each update.
+3. **Track Progress**: Always maintain progress file to resume if interrupted.
+4. **Accurate Regions**: Provide precise line numbers for endpoint definitions.
+6. **Relative Paths**: `file_path` must be relative to project root, using `/` separator.
+2026-04-07 16:25:09.009 | Agent    | langchain_zast.agents.claude.agent:_log:249 - <think>The user wants me to enumerate all API endpoints and controllers in this project. Let me first check what project we're dealing with and identify the framework.
+
+Looking at the path: `D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\.zast\llm-auditor\`
+
+This appears to be related to a Go project (google-osv-api-go). Let me first check what files are in this directory to understand the project structure.
+</think>
+
+I'll enumerate the API endpoints in this project. Let me first identify the framework and project structure.
+
+2026-04-07 16:25:09.876 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Glob
+Args: {
+  "pattern": "D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/.zast/llm-auditor/**/*"
+}
+2026-04-07 16:25:09.972 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/.zast/llm-auditor\.env
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/.zast/llm-auditor\llm_auditor.log
+isError: None
+2026-04-07 16:25:13.099 | Agent    | langchain_zast.agents.claude.agent:_log:249 - It seems the `.zast/llm-auditor` directory only contains a few files. Let me check the parent directory to understand the project structure better.
+</think>
+
+
+
+2026-04-07 16:25:13.955 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Glob
+Args: {
+  "pattern": "D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/**/*"
+}
+2026-04-07 16:25:14.060 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\admin.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\archive.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\auth.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\bounce.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\campaigns.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\events.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\handlers.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\i18n.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\import.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\init.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\install.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\lists.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\main.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\maintenance.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\manager_store.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\media.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\public.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\roles.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\settings.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\subscribers.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\templates.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\tx.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\updates.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\upgrade.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\users.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\cmd\utils.go
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\config.toml.sample
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\CONTRIBUTING.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\dev\.gitignore
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\dev\app.Dockerfile
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\dev\config.toml
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\dev\docker-compose.yml
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\dev\README.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docker-entrypoint.sh
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\Dockerfile
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\apis\apis.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\apis\bounces.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\apis\campaigns.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\apis\import.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\apis\lists.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\apis\media.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\apis\sdks.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\apis\subscribers.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\apis\templates.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\apis\transactional.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\archives.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\bounces.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\concepts.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\configuration.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\developer-setup.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\external-integration.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\i18n.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\images\2021-09-28_00-18.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\images\archived-campaign-metadata.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\images\edit-subscriber.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\images\favicon.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\images\logo.svg
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\images\query-subscribers.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\images\splash.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\index.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\installation.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\maintenance\performance.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\messengers.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\oidc.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\querying-and-segmentation.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\roles-and-permissions.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\static\style.css
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\templating.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\content\upgrade.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\mkdocs.yml
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\docs\requirements.txt
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\i18n\index.html
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\i18n\main.js
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\i18n\style.css
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\i18n\vue.min.js
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\README.md
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\.hugo_build.lock
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\config.toml
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\content\.gitignore
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\data\github.json
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\layouts\index.html
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\layouts\page\single.html
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\layouts\partials\footer.html
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\layouts\partials\header.html
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\layouts\shortcodes\centered.html
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\layouts\shortcodes\github.html
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\layouts\shortcodes\half.html
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\layouts\shortcodes\section.html
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\static\static\base.css
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\static\static\images\2022-07-31_19-07.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\static\static\images\2022-07-31_19-08.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\static\static\images\analytics.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\static\static\images\favicon.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\static\static\images\listmonk.src.svg
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\static\static\images\lists.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\static\static\images\logo.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\static\static\images\logo.svg
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\static\static\images\media.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\static\static\images\messengers.png
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\docs\site\static\static\images\performance.png
+(Results are truncated. Consider using a more specific path or pattern.)
+isError: None
+2026-04-07 16:25:16.219 | Agent    | langchain_zast.agents.claude.agent:_log:249 - This is a Go project. Let me check the go.mod file to identify the framework being used (Gin, Echo, etc.)
+</think>
+
+Let me check the go.mod file to identify the framework:
+
+2026-04-07 16:25:17.161 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Glob
+Args: {
+  "pattern": "D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/go.mod"
+}
+2026-04-07 16:25:17.238 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\go.mod
+D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136\fixed\go.mod
+isError: None
+2026-04-07 16:25:18.937 | Agent    | langchain_zast.agents.claude.agent:_log:249 - Good, this is a Go project. Let me read the go.mod to identify the framework.
+</think>
+
+
+
+2026-04-07 16:25:20.048 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Read
+Args: {
+  "file_path": "D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/go.mod"
+}
+2026-04-07 16:25:20.079 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult:      1→module github.com/knadh/listmonk
+     2→
+     3→go 1.24.1
+     4→
+     5→require (
+     6→	github.com/Masterminds/sprig/v3 v3.3.0
+     7→	github.com/coreos/go-oidc/v3 v3.14.1
+     8→	github.com/disintegration/imaging v1.6.2
+     9→	github.com/emersion/go-message v0.18.2
+    10→	github.com/gdgvda/cron v0.4.0
+    11→	github.com/gofrs/uuid/v5 v5.3.2
+    12→	github.com/gorilla/feeds v1.2.0
+    13→	github.com/jmoiron/sqlx v1.4.0
+    14→	github.com/knadh/go-pop3 v1.0.0
+    15→	github.com/knadh/goyesql/v2 v2.2.0
+    16→	github.com/knadh/koanf/maps v0.1.2
+    17→	github.com/knadh/koanf/parsers/json v1.0.0
+    18→	github.com/knadh/koanf/parsers/toml v0.1.0
+    19→	github.com/knadh/koanf/providers/confmap v1.0.0
+    20→	github.com/knadh/koanf/providers/env v1.1.0
+    21→	github.com/knadh/koanf/providers/file v1.2.0
+    22→	github.com/knadh/koanf/providers/posflag v1.0.0
+    23→	github.com/knadh/koanf/providers/rawbytes v1.0.0
+    24→	github.com/knadh/koanf/v2 v2.2.0
+    25→	github.com/knadh/paginator v1.0.1
+    26→	github.com/knadh/smtppool/v2 v2.0.0
+    27→	github.com/knadh/stuffbin v1.3.0
+    28→	github.com/labstack/echo/v4 v4.13.3
+    29→	github.com/lib/pq v1.10.9
+    30→	github.com/paulbellamy/ratecounter v0.2.0
+    31→	github.com/rhnvrm/simples3 v0.9.0
+    32→	github.com/spf13/pflag v1.0.6
+    33→	github.com/yuin/goldmark v1.7.10
+    34→	github.com/zerodha/easyjson v1.0.1
+    35→	github.com/zerodha/simplesessions/stores/postgres/v3 v3.0.0
+    36→	github.com/zerodha/simplesessions/v3 v3.0.0
+    37→	golang.org/x/mod v0.24.0
+    38→	golang.org/x/oauth2 v0.29.0
+    39→	golang.org/x/text v0.24.0
+    40→	gopkg.in/volatiletech/null.v6 v6.0.0-20170828023728-0bef4e07ae1b
+    41→)
+    42→
+    43→require (
+    44→	dario.cat/mergo v1.0.1 // indirect
+    45→	github.com/Masterminds/goutils v1.1.1 // indirect
+    46→	github.com/Masterminds/semver/v3 v3.3.1 // indirect
+    47→	github.com/fsnotify/fsnotify v1.9.0 // indirect
+    48→	github.com/go-jose/go-jose/v4 v4.1.0 // indirect
+    49→	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+    50→	github.com/google/uuid v1.6.0 // indirect
+    51→	github.com/huandu/xstrings v1.5.0 // indirect
+    52→	github.com/josharian/intern v1.0.0 // indirect
+    53→	github.com/labstack/gommon v0.4.2 // indirect
+    54→	github.com/mattn/go-colorable v0.1.14 // indirect
+    55→	github.com/mattn/go-isatty v0.0.20 // indirect
+    56→	github.com/mitchellh/copystructure v1.2.0 // indirect
+    57→	github.com/mitchellh/reflectwalk v1.0.2 // indirect
+    58→	github.com/pelletier/go-toml v1.9.5 // indirect
+    59→	github.com/shopspring/decimal v1.4.0 // indirect
+    60→	github.com/spf13/cast v1.7.1 // indirect
+    61→	github.com/valyala/bytebufferpool v1.0.0 // indirect
+    62→	github.com/valyala/fasttemplate v1.2.2 // indirect
+    63→	golang.org/x/crypto v0.37.0 // indirect
+    64→	golang.org/x/image v0.26.0 // indirect
+    65→	golang.org/x/net v0.39.0 // indirect
+    66→	golang.org/x/sys v0.32.0 // indirect
+    67→	golang.org/x/time v0.11.0 // indirect
+    68→)
+    69→
+    70→replace github.com/imdario/mergo => github.com/imdario/mergo v0.3.8
+    71→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>
+
+isError: None
+2026-04-07 16:25:24.149 | Agent    | langchain_zast.agents.claude.agent:_log:249 - This is a Go project using **Echo** framework (`github.com/labstack/echo/v4`). Now I need to:
+1. Look at the framework reference for Echo to understand how routes are defined
+2. Find all controller/route definitions in the cmd directory
+3. Create a progress file
+4. Enumerate all endpoints
+
+Let me first read the Echo reference to understand how routes work in this framework.
+</think>
+
+This is a Go project using **Echo** framework (`github.com/labstack/echo/v4`). Let me read the framework reference and then enumerate the controllers.
+
+2026-04-07 16:25:25.271 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Read
+Args: {
+  "file_path": "D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/.claude/skills/enumerate-controllers/references/go/echo.md"
+}
+2026-04-07 16:25:25.310 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult:      1→# Echo Endpoint Enumeration Reference
+     2→
+     3→## Overview
+     4→
+     5→Echo is a high-performance Go web framework. Routes are registered on `echo.Echo` or `echo.Group`. This guide covers all patterns for enumerating API endpoints in Echo applications.
+     6→
+     7→---
+     8→
+     9→## 1. Route Registration Methods
+    10→
+    11→### 1.1 HTTP Method Functions
+    12→
+    13→| Method | HTTP Method | Description |
+    14→|--------|-------------|-------------|
+    15→| `e.GET()` | GET | Retrieve data |
+    16→| `e.POST()` | POST | Create resource |
+    17→| `e.PUT()` | PUT | Replace resource |
+    18→| `e.DELETE()` | DELETE | Delete resource |
+    19→| `e.PATCH()` | PATCH | Partial update |
+    20→| `e.OPTIONS()` | OPTIONS | CORS preflight |
+    21→| `e.HEAD()` | HEAD | Headers only |
+    22→| `e.Match()` | Multiple | Match specified methods |
+    23→| `e.Any()` | All | Match all methods |
+    24→
+    25→### 1.2 Basic Route Registration
+    26→
+    27→```go
+    28→package main
+    29→
+    30→import (
+    31→    "net/http"
+    32→    "github.com/labstack/echo/v5"
+    33→)
+    34→
+    35→func main() {
+    36→    e := echo.New()
+    37→
+    38→    // Basic routes
+    39→    e.GET("/users", getUsers)
+    40→    e.POST("/users", createUser)
+    41→    e.GET("/users/:id", getUser)
+    42→    e.PUT("/users/:id", updateUser)
+    43→    e.DELETE("/users/:id", deleteUser)
+    44→
+    45→    // Match multiple methods
+    46→    e.Match([]string{"GET", "POST"}, "/api/data", handleData)
+    47→
+    48→    // Match all methods
+    49→    e.Any("/webhook", handleWebhook)
+    50→
+    51→    e.Start(":8080")
+    52→}
+    53→```
+    54→
+    55→---
+    56→
+    57→## 2. Router Groups
+    58→
+    59→### 2.1 Basic Grouping
+    60→
+    61→```go
+    62→func main() {
+    63→    e := echo.New()
+    64→
+    65→    // API v1 group
+    66→    v1 := e.Group("/api/v1")
+    67→    v1.GET("/users", listUsersV1)
+    68→    v1.GET("/users/:id", getUserV1)
+    69→
+    70→    // Group with middleware
+    71→    v2 := e.Group("/api/v2", middleware.RequestLogger())
+    72→    v2.GET("/users", listUsersV2)
+    73→    v2.GET("/users/:id", getUserV2)
+    74→
+    75→    e.Start(":8080")
+    76→}
+    77→```
+    78→
+    79→### 2.2 Nested Groups
+    80→
+    81→```go
+    82→func main() {
+    83→    e := echo.New()
+    84→
+    85→    // Admin group with middleware
+    86→    admin := e.Group("/admin", authMiddleware)
+    87→    admin.GET("/stats", getStats)
+    88→    admin.POST("/config", updateConfig)
+    89→
+    90→    // Nested group
+    91→    users := admin.Group("/users")
+    92→    users.GET("", listAllUsers)
+    93→    users.DELETE("/:id", deleteUser)
+    94→
+    95→    e.Start(":8080")
+    96→}
+    97→```
+    98→
+    99→---
+   100→
+   101→## 3. Path Parameters
+   102→
+   103→### 3.1 Named Parameters
+   104→
+   105→```go
+   106→// Single parameter
+   107→e.GET("/users/:id", func(c *echo.Context) error {
+   108→    id := c.Param("id")
+   109→    return c.JSON(http.StatusOK, map[string]string{"id": id})
+   110→})
+   111→
+   112→// Multiple parameters
+   113→e.GET("/users/:userId/posts/:postId", func(c *echo.Context) error {
+   114→    userId := c.Param("userId")
+   115→    postId := c.Param("postId")
+   116→    return c.JSON(http.StatusOK, map[string]string{
+   117→        "userId": userId,
+   118→        "postId": postId,
+   119→    })
+   120→})
+   121→```
+   122→
+   123→### 3.2 Wildcard Parameters
+   124→
+   125→```go
+   126→// Wildcard captures everything after prefix
+   127→e.GET("/files/*", func(c *echo.Context) error {
+   128→    filepath := c.Param("*") // "images/logo.png"
+   129→    return c.String(http.StatusOK, "File: "+filepath)
+   130→})
+   131→```
+   132→
+   133→### 3.3 Query Parameters
+   134→
+   135→```go
+   136→e.GET("/search", func(c *echo.Context) error {
+   137→    name := c.QueryParam("name")
+   138→    page := c.QueryParamDefault("page", "1")
+   139→    return c.JSON(http.StatusOK, map[string]string{
+   140→        "name": name,
+   141→        "page": page,
+   142→    })
+   143→})
+   144→```
+   145→
+   146→### 3.4 Type-Safe Parameter Extraction (Echo v5)
+   147→
+   148→```go
+   149→// Type-safe path parameter
+   150→e.GET("/users/:id", func(c *echo.Context) error {
+   151→    id, err := echo.PathParam[int](c, "id")
+   152→    if err != nil {
+   153→        return err
+   154→    }
+   155→    return c.JSON(http.StatusOK, map[string]int{"id": id})
+   156→})
+   157→
+   158→// Struct binding
+   159→type PathParams struct {
+   160→    UserID string `param:"user_id"`
+   161→    PostID int    `param:"post_id"`
+   162→}
+   163→
+   164→e.GET("/users/:user_id/posts/:post_id", func(c echo.Context) error {
+   165→    params := new(PathParams)
+   166→    if err := echo.BindPathValues(c, params); err != nil {
+   167→        return err
+   168→    }
+   169→    return c.JSON(http.StatusOK, params)
+   170→})
+   171→```
+   172→
+   173→---
+   174→
+   175→## 4. Middleware
+   176→
+   177→### 4.1 Global Middleware
+   178→
+   179→```go
+   180→func main() {
+   181→    e := echo.New()
+   182→
+   183→    // Pre-middleware (before routing)
+   184→    e.Pre(middleware.AddTrailingSlash())
+   185→
+   186→    // Global middleware (after routing)
+   187→    e.Use(middleware.Logger())
+   188→    e.Use(middleware.Recover())
+   189→    e.Use(middleware.CORS())
+   190→
+   191→    e.Start(":8080")
+   192→}
+   193→```
+   194→
+   195→### 4.2 Group Middleware
+   196→
+   197→```go
+   198→// Middleware applies to group
+   199→api := e.Group("/api", middleware.RequestID())
+   200→api.GET("/data", apiHandler)
+   201→```
+   202→
+   203→### 4.3 Route-Level Middleware
+   204→
+   205→```go
+   206→e.GET("/public", publicHandler)
+   207→e.GET("/protected", protectedHandler, authMiddleware())
+   208→```
+   209→
+   210→### 4.4 Custom Middleware
+   211→
+   212→```go
+   213→func authMiddleware() echo.MiddlewareFunc {
+   214→    return func(next echo.HandlerFunc) echo.HandlerFunc {
+   215→        return func(c *echo.Context) error {
+   216→            token := c.Request().Header.Get("Authorization")
+   217→            if token == "" {
+   218→                return echo.ErrUnauthorized
+   219→            }
+   220→            return next(c)
+   221→        }
+   222→    }
+   223→}
+   224→```
+   225→
+   226→---
+   227→
+   228→## 5. Handler Signatures
+   229→
+   230→### 5.1 Echo v5 Handler
+   231→
+   232→```go
+   233→// v5 handler signature (Context is a pointer)
+   234→func getUsers(c *echo.Context) error {
+   235→    // Path parameter
+   236→    id := c.Param("id")
+   237→
+   238→    // Query parameter
+   239→    name := c.QueryParam("name")
+   240→
+   241→    // Request body
+   242→    var user User
+   243→    if err := c.Bind(&user); err != nil {
+   244→        return err
+   245→    }
+   246→
+   247→    // Response
+   248→    return c.JSON(http.StatusOK, map[string]interface{}{
+   249→        "data": users,
+   250→    })
+   251→}
+   252→```
+   253→
+   254→---
+   255→
+   256→## 6. Locating Handler Functions
+   257→
+   258→### 6.1 AST Search Patterns
+   259→
+   260→```go
+   261→// Search for route registration
+   262→ast_grep_search(pattern='e.GET($PATH, $HANDLER)', lang='go')
+   263→ast_grep_search(pattern='e.POST($PATH, $HANDLER)', lang='go')
+   264→ast_grep_search(pattern='e.PUT($PATH, $HANDLER)', lang='go')
+   265→ast_grep_search(pattern='e.DELETE($PATH, $HANDLER)', lang='go')
+   266→ast_grep_search(pattern='e.Any($PATH, $HANDLER)', lang='go')
+   267→ast_grep_search(pattern='e.Match($METHODS, $PATH, $HANDLER)', lang='go')
+   268→
+   269→// Search for group creation
+   270→ast_grep_search(pattern='$VAR := e.Group($PATH)', lang='go')
+   271→
+   272→// Search for middleware
+   273→ast_grep_search(pattern='e.Use($MIDDLEWARE)', lang='go')
+   274→ast_grep_search(pattern='e.Pre($MIDDLEWARE)', lang='go')
+   275→```
+   276→
+   277→### 6.2 Regex Search Patterns
+   278→
+   279→```regex
+   280→\.(GET|POST|PUT|DELETE|PATCH|Any|Match)\s*\(
+   281→\.Group\s*\(
+   282→\.Use\s*\(
+   283→\.Pre\s*\(
+   284→c\.Param\s*\(
+   285→c\.QueryParam\s*\(
+   286→```
+   287→
+   288→### 6.3 Key Files to Check
+   289→
+   290→| Directory | Purpose |
+   291→|-----------|---------|
+   292→| `main.go` | Application entry |
+   293→| `routes/` | Route definitions |
+   294→| `handlers/` | Handler functions |
+   295→| `controllers/` | Controller logic |
+   296→| `api/` | API endpoints |
+   297→
+   298→---
+   299→
+   300→## 7. Security Audit Checklist
+   301→
+   302→- [ ] Identify all `e.GET/POST/PUT/DELETE` calls
+   303→- [ ] Trace router groups and their prefixes
+   304→- [ ] Check middleware application (global, group, route)
+   305→- [ ] Verify path parameter validation
+   306→- [ ] Check wildcard routes for path traversal risks
+   307→- [ ] Review `Any()` and `Match()` for unintended exposure
+   308→- [ ] Check `Pre` vs `Use` middleware ordering
+   309→- [ ] Verify authentication middleware coverage
+   310→
+   311→
+   312→
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>
+
+isError: None
+2026-04-07 16:25:31.235 | Agent    | langchain_zast.agents.claude.agent:_log:249 - <think>Now I understand how Echo routes work. Let me start by examining the main.go file and all the cmd files to enumerate the endpoints. Let me first create a progress file and then search for route registrations in the codebase.
+</think>
+
+Now let me examine the main.go file and all the cmd files to identify the routes:
+
+2026-04-07 16:25:31.235 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Grep
+Args: {
+  "pattern": "\\.(GET|POST|PUT|DELETE|PATCH|Any|Match)\\s*\\(",
+  "path": "D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/cmd",
+  "output_mode": "content"
+}
+2026-04-07 16:25:31.353 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: <persisted-output>
+Output too large (20.3KB). Full output saved to: C:\Users\YMKW\.claude\projects\D--cvedetails-google-osv-api-go-go-sinks-sources-CWE-1336-CVE-2025-49136\08ef33fa-95ed-49b9-b0f8-3170d583cfd1\tool-results\chatcmpl-tool-badfbf20a81880fb.txt
+
+Preview (first 2KB):
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\campaigns.go:592:	} else if !reFromAddress.Match([]byte(c.FromEmail)) {
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\init.go:876:	srv.GET("/public/static/*", echo.WrapHandler(fSrv))
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\init.go:879:	srv.GET("/admin/static/*", echo.WrapHandler(fSrv))
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:65:		g.GET(path.Join(uriAdmin, ""), a.AdminPage)
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:66:		g.GET(path.Join(uriAdmin, "/custom.css"), serveCustomAppearance("admin.custom_css"))
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:67:		g.GET(path.Join(uriAdmin, "/custom.js"), serveCustomAppearance("admin.custom_js"))
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:68:		g.GET(path.Join(uriAdmin, "/*"), a.AdminPage)
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:94:		g.GET("/api/health", a.HealthCheck)
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:95:		g.GET("/api/config", a.GetServerConfig)
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:96:		g.GET("/api/lang/:lang", a.GetI18nLang)
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:97:		g.GET("/api/dashboard/charts", a.GetDashboardCharts)
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:98:		g.GET("/api/dashboard/counts", a.GetDashboardCounts)
+D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:100:		g.GET("/api/settings", pm(a.GetSettings, "settings:get"))
+...
+</persisted-output>
+isError: None
+2026-04-07 16:25:33.841 | Agent    | langchain_zast.agents.claude.agent:_log:249 - There's a lot of results. Let me read the full output to understand all the endpoints.
+</think>
+
+
+
+2026-04-07 16:25:35.850 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Read
+Args: {
+  "file_path": "C:/Users/YMKW/.claude/projects/D--cvedetails-google-osv-api-go-go-sinks-sources-CWE-1336-CVE-2025-49136/08ef33fa-95ed-49b9-b0f8-3170d583cfd1/tool-results/chatcmpl-tool-badfbf20a81880fb.txt"
+}
+2026-04-07 16:25:35.867 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult:      1→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\campaigns.go:592:	} else if !reFromAddress.Match([]byte(c.FromEmail)) {
+     2→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\init.go:876:	srv.GET("/public/static/*", echo.WrapHandler(fSrv))
+     3→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\init.go:879:	srv.GET("/admin/static/*", echo.WrapHandler(fSrv))
+     4→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:65:		g.GET(path.Join(uriAdmin, ""), a.AdminPage)
+     5→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:66:		g.GET(path.Join(uriAdmin, "/custom.css"), serveCustomAppearance("admin.custom_css"))
+     6→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:67:		g.GET(path.Join(uriAdmin, "/custom.js"), serveCustomAppearance("admin.custom_js"))
+     7→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:68:		g.GET(path.Join(uriAdmin, "/*"), a.AdminPage)
+     8→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:94:		g.GET("/api/health", a.HealthCheck)
+     9→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:95:		g.GET("/api/config", a.GetServerConfig)
+    10→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:96:		g.GET("/api/lang/:lang", a.GetI18nLang)
+    11→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:97:		g.GET("/api/dashboard/charts", a.GetDashboardCharts)
+    12→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:98:		g.GET("/api/dashboard/counts", a.GetDashboardCounts)
+    13→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:100:		g.GET("/api/settings", pm(a.GetSettings, "settings:get"))
+    14→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:101:		g.PUT("/api/settings", pm(a.UpdateSettings, "settings:manage"))
+    15→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:102:		g.POST("/api/settings/smtp/test", pm(a.TestSMTPSettings, "settings:manage"))
+    16→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:103:		g.POST("/api/admin/reload", pm(a.ReloadApp, "settings:manage"))
+    17→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:104:		g.GET("/api/logs", pm(a.GetLogs, "settings:get"))
+    18→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:105:		g.GET("/api/events", pm(a.EventStream, "settings:get"))
+    19→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:106:		g.GET("/api/about", a.GetAboutInfo)
+    20→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:108:		g.GET("/api/subscribers", pm(a.QuerySubscribers, "subscribers:get_all", "subscribers:get"))
+    21→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:109:		g.GET("/api/subscribers/:id", pm(hasID(a.GetSubscriber), "subscribers:get_all", "subscribers:get"))
+    22→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:110:		g.GET("/api/subscribers/:id/export", pm(hasID(a.ExportSubscriberData), "subscribers:get_all", "subscribers:get"))
+    23→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:111:		g.GET("/api/subscribers/:id/bounces", pm(hasID(a.GetSubscriberBounces), "bounces:get"))
+    24→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:112:		g.DELETE("/api/subscribers/:id/bounces", pm(hasID(a.DeleteSubscriberBounces), "bounces:manage"))
+    25→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:113:		g.POST("/api/subscribers", pm(a.CreateSubscriber, "subscribers:manage"))
+    26→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:114:		g.PUT("/api/subscribers/:id", pm(hasID(a.UpdateSubscriber), "subscribers:manage"))
+    27→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:115:		g.POST("/api/subscribers/:id/optin", pm(hasID(a.SubscriberSendOptin), "subscribers:manage"))
+    28→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:116:		g.PUT("/api/subscribers/blocklist", pm(a.BlocklistSubscribers, "subscribers:manage"))
+    29→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:117:		g.PUT("/api/subscribers/:id/blocklist", pm(hasID(a.BlocklistSubscriber), "subscribers:manage"))
+    30→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:118:		g.PUT("/api/subscribers/lists/:id", pm(a.ManageSubscriberLists, "subscribers:manage"))
+    31→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:119:		g.PUT("/api/subscribers/lists", pm(a.ManageSubscriberLists, "subscribers:manage"))
+    32→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:120:		g.DELETE("/api/subscribers/:id", pm(hasID(a.DeleteSubscriber), "subscribers:manage"))
+    33→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:121:		g.DELETE("/api/subscribers", pm(a.DeleteSubscribers, "subscribers:manage"))
+    34→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:123:		g.GET("/api/bounces", pm(a.GetBounces, "bounces:get"))
+    35→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:124:		g.GET("/api/bounces/:id", pm(hasID(a.GetBounce), "bounces:get"))
+    36→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:125:		g.DELETE("/api/bounces", pm(a.DeleteBounces, "bounces:manage"))
+    37→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:126:		g.DELETE("/api/bounces/:id", pm(hasID(a.DeleteBounce), "bounces:manage"))
+    38→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:130:		g.POST("/api/subscribers/query/delete", pm(a.DeleteSubscribersByQuery, "subscribers:manage"))
+    39→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:131:		g.PUT("/api/subscribers/query/blocklist", pm(a.BlocklistSubscribersByQuery, "subscribers:manage"))
+    40→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:132:		g.PUT("/api/subscribers/query/lists", pm(a.ManageSubscriberListsByQuery, "subscribers:manage"))
+    41→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:133:		g.GET("/api/subscribers/export",
+    42→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:136:		g.GET("/api/import/subscribers", pm(a.GetImportSubscribers, "subscribers:import"))
+    43→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:137:		g.GET("/api/import/subscribers/logs", pm(a.GetImportSubscriberStats, "subscribers:import"))
+    44→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:138:		g.POST("/api/import/subscribers", pm(a.ImportSubscribers, "subscribers:import"))
+    45→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:139:		g.DELETE("/api/import/subscribers", pm(a.StopImportSubscribers, "subscribers:import"))
+    46→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:142:		g.GET("/api/lists", a.GetLists)
+    47→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:143:		g.GET("/api/lists/:id", hasID(a.GetList))
+    48→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:144:		g.POST("/api/lists", pm(a.CreateList, "lists:manage_all"))
+    49→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:145:		g.PUT("/api/lists/:id", hasID(a.UpdateList))
+    50→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:146:		g.DELETE("/api/lists/:id", hasID(a.DeleteLists))
+    51→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:148:		g.GET("/api/campaigns", pm(a.GetCampaigns, "campaigns:get_all", "campaigns:get"))
+    52→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:149:		g.GET("/api/campaigns/running/stats", pm(a.GetRunningCampaignStats, "campaigns:get_all", "campaigns:get"))
+    53→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:150:		g.GET("/api/campaigns/:id", pm(hasID(a.GetCampaign), "campaigns:get_all", "campaigns:get"))
+    54→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:151:		g.GET("/api/campaigns/analytics/:type", pm(a.GetCampaignViewAnalytics, "campaigns:get_analytics"))
+    55→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:152:		g.GET("/api/campaigns/:id/preview", pm(hasID(a.PreviewCampaign), "campaigns:get_all", "campaigns:get"))
+    56→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:153:		g.POST("/api/campaigns/:id/preview/archive", pm(hasID(a.PreviewCampaignArchive), "campaigns:get_all", "campaigns:get"))
+    57→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:154:		g.POST("/api/campaigns/:id/preview", pm(hasID(a.PreviewCampaign), "campaigns:get_all", "campaigns:get"))
+    58→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:155:		g.POST("/api/campaigns/:id/content", pm(hasID(a.CampaignContent), "campaigns:manage_all", "campaigns:manage"))
+    59→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:156:		g.POST("/api/campaigns/:id/text", pm(hasID(a.PreviewCampaign), "campaigns:get"))
+    60→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:157:		g.POST("/api/campaigns/:id/test", pm(hasID(a.TestCampaign), "campaigns:manage_all", "campaigns:manage"))
+    61→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:158:		g.POST("/api/campaigns", pm(a.CreateCampaign, "campaigns:manage_all", "campaigns:manage"))
+    62→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:159:		g.PUT("/api/campaigns/:id", pm(hasID(a.UpdateCampaign), "campaigns:manage_all", "campaigns:manage"))
+    63→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:160:		g.PUT("/api/campaigns/:id/status", pm(hasID(a.UpdateCampaignStatus), "campaigns:manage_all", "campaigns:manage"))
+    64→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:161:		g.PUT("/api/campaigns/:id/archive", pm(hasID(a.UpdateCampaignArchive), "campaigns:manage_all", "campaigns:manage"))
+    65→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:162:		g.DELETE("/api/campaigns/:id", pm(hasID(a.DeleteCampaign), "campaigns:manage_all", "campaigns:manage"))
+    66→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:164:		g.GET("/api/media", pm(a.GetAllMedia, "media:get"))
+    67→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:165:		g.GET("/api/media/:id", pm(hasID(a.GetMedia), "media:get"))
+    68→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:166:		g.POST("/api/media", pm(a.UploadMedia, "media:manage"))
+    69→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:167:		g.DELETE("/api/media/:id", pm(hasID(a.DeleteMedia), "media:manage"))
+    70→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:169:		g.GET("/api/templates", pm(a.GetTemplates, "templates:get"))
+    71→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:170:		g.GET("/api/templates/:id", pm(hasID(a.GetTemplate), "templates:get"))
+    72→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:171:		g.GET("/api/templates/:id/preview", pm(hasID(a.PreviewTemplate), "templates:get"))
+    73→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:172:		g.POST("/api/templates/preview", pm(a.PreviewTemplateBody, "templates:get"))
+    74→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:173:		g.POST("/api/templates", pm(a.CreateTemplate, "templates:manage"))
+    75→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:174:		g.PUT("/api/templates/:id", pm(hasID(a.UpdateTemplate), "templates:manage"))
+    76→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:175:		g.PUT("/api/templates/:id/default", pm(hasID(a.TemplateSetDefault), "templates:manage"))
+    77→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:176:		g.DELETE("/api/templates/:id", pm(hasID(a.DeleteTemplate), "templates:manage"))
+    78→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:178:		g.DELETE("/api/maintenance/subscribers/:type", pm(a.GCSubscribers, "settings:maintain"))
+    79→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:179:		g.DELETE("/api/maintenance/analytics/:type", pm(a.GCCampaignAnalytics, "settings:maintain"))
+    80→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:180:		g.DELETE("/api/maintenance/subscriptions/unconfirmed", pm(a.GCSubscriptions, "settings:maintain"))
+    81→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:182:		g.POST("/api/tx", pm(a.SendTxMessage, "tx:send"))
+    82→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:184:		g.GET("/api/profile", a.GetUserProfile)
+    83→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:185:		g.PUT("/api/profile", a.UpdateUserProfile)
+    84→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:186:		g.GET("/api/users", pm(a.GetUsers, "users:get"))
+    85→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:187:		g.GET("/api/users/:id", pm(hasID(a.GetUser), "users:get"))
+    86→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:188:		g.POST("/api/users", pm(a.CreateUser, "users:manage"))
+    87→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:189:		g.PUT("/api/users/:id", pm(hasID(a.UpdateUser), "users:manage"))
+    88→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:190:		g.DELETE("/api/users", pm(a.DeleteUsers, "users:manage"))
+    89→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:191:		g.DELETE("/api/users/:id", pm(hasID(a.DeleteUser), "users:manage"))
+    90→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:192:		g.POST("/api/logout", a.Logout)
+    91→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:194:		g.GET("/api/roles/users", pm(a.GetUserRoles, "roles:get"))
+    92→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:195:		g.GET("/api/roles/lists", pm(a.GeListRoles, "roles:get"))
+    93→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:196:		g.POST("/api/roles/users", pm(a.CreateUserRole, "roles:manage"))
+    94→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:197:		g.POST("/api/roles/lists", pm(a.CreateListRole, "roles:manage"))
+    95→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:198:		g.PUT("/api/roles/users/:id", pm(hasID(a.UpdateUserRole), "roles:manage"))
+    96→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:199:		g.PUT("/api/roles/lists/:id", pm(hasID(a.UpdateListRole), "roles:manage"))
+    97→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:200:		g.DELETE("/api/roles/:id", pm(hasID(a.DeleteRole), "roles:manage"))
+    98→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:204:			g.POST("/webhooks/bounce", pm(a.BounceWebhook, "webhooks:post_bounce"))
+    99→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:216:			g.POST("/webhooks/service/:service", a.BounceWebhook)
+   100→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:220:		g.GET("/", func(c echo.Context) error {
+   101→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:225:		g.GET(path.Join(uriAdmin, "/login"), a.LoginPage)
+   102→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:226:		g.POST(path.Join(uriAdmin, "/login"), a.LoginPage)
+   103→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:229:			g.POST("/auth/oidc", a.OIDCLogin)
+   104→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:230:			g.GET("/auth/oidc", a.OIDCFinish)
+   105→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:234:		g.GET("/api/public/lists", a.GetPublicLists)
+   106→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:235:		g.POST("/api/public/subscription", a.PublicSubscription)
+   107→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:237:			g.GET("/api/public/archive", a.GetCampaignArchives)
+   108→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:242:		g.GET("/subscription/form", a.SubscriptionFormPage)
+   109→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:243:		g.POST("/subscription/form", a.SubscriptionForm)
+   110→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:244:		g.GET("/subscription/:campUUID/:subUUID", noIndex(a.hasUUID(a.hasSub(a.SubscriptionPage), "campUUID", "subUUID")))
+   111→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:245:		g.POST("/subscription/:campUUID/:subUUID", a.hasUUID(a.hasSub(a.SubscriptionPrefs), "campUUID", "subUUID"))
+   112→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:246:		g.GET("/subscription/optin/:subUUID", noIndex(a.hasUUID(a.hasSub(a.OptinPage), "subUUID")))
+   113→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:247:		g.POST("/subscription/optin/:subUUID", a.hasUUID(a.hasSub(a.OptinPage), "subUUID"))
+   114→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:248:		g.POST("/subscription/export/:subUUID", a.hasUUID(a.hasSub(a.SelfExportSubscriberData), "subUUID"))
+   115→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:249:		g.POST("/subscription/wipe/:subUUID", a.hasUUID(a.hasSub(a.WipeSubscriberData), "subUUID"))
+   116→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:250:		g.GET("/link/:linkUUID/:campUUID/:subUUID", noIndex(a.hasUUID(a.LinkRedirect, "linkUUID", "campUUID", "subUUID")))
+   117→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:251:		g.GET("/campaign/:campUUID/:subUUID", noIndex(a.hasUUID(a.ViewCampaignMessage, "campUUID", "subUUID")))
+   118→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:252:		g.GET("/campaign/:campUUID/:subUUID/px.png", noIndex(a.hasUUID(a.RegisterCampaignView, "campUUID", "subUUID")))
+   119→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:255:			g.GET("/archive", a.CampaignArchivesPage)
+   120→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:256:			g.GET("/archive.xml", a.GetCampaignArchivesFeed)
+   121→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:257:			g.GET("/archive/:id", a.CampaignArchivePage)
+   122→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:258:			g.GET("/archive/latest", a.CampaignArchivePageLatest)
+   123→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:261:		g.GET("/public/custom.css", serveCustomAppearance("public.custom_css"))
+   124→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:262:		g.GET("/public/custom.js", serveCustomAppearance("public.custom_js"))
+   125→D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\cmd\handlers.go:265:		g.GET("/health", a.HealthCheck)
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>
+
+isError: None
+2026-04-07 16:25:38.992 | Agent    | langchain_zast.agents.claude.agent:_log:249 - Now I have a good view of all the endpoints. Let me read the handlers.go file to get more context on where these routes are defined, and check if there are more endpoints. Let me also look at some files for additional context.
+</think>
+
+
+
+2026-04-07 16:25:42.778 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: TodoWrite
+Args: {
+  "todos": [
+    {
+      "content": "Create progress file and initialize JSON",
+      "status": "in_progress",
+      "activeForm": "Creating progress file and initializing JSON"
+    },
+    {
+      "content": "Parse handlers.go for API endpoints",
+      "status": "pending",
+      "activeForm": "Parsing handlers.go for API endpoints"
+    },
+    {
+      "content": "Parse init.go for static routes",
+      "status": "pending",
+      "activeForm": "Parsing init.go for static routes"
+    },
+    {
+      "content": "Validate JSON structure",
+      "status": "pending",
+      "activeForm": "Validating JSON structure"
+    },
+    {
+      "content": "Save to controller_sources.json",
+      "status": "pending",
+      "activeForm": "Saving to controller_sources.json"
+    }
+  ]
+}
+2026-04-07 16:25:42.791 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable
+isError: None
+2026-04-07 16:25:46.083 | Agent    | langchain_zast.agents.claude.agent:_log:249 - Now let me create a progress file and extract the endpoints more comprehensively. I need to look at the handlers.go file to get precise line numbers.
+</think>
+
+
+
+2026-04-07 16:25:47.136 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Read
+Args: {
+  "file_path": "D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/cmd/handlers.go",
+  "limit": 100
+}
+2026-04-07 16:25:47.151 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult:      1→package main
+     2→
+     3→import (
+     4→	"bytes"
+     5→	"net/http"
+     6→	"net/url"
+     7→	"path"
+     8→	"regexp"
+     9→	"strconv"
+    10→
+    11→	"github.com/knadh/listmonk/internal/auth"
+    12→	"github.com/labstack/echo/v4"
+    13→	"github.com/labstack/echo/v4/middleware"
+    14→)
+    15→
+    16→const (
+    17→	// stdInputMaxLen is the maximum allowed length for a standard input field.
+    18→	stdInputMaxLen = 2000
+    19→
+    20→	// URIs.
+    21→	uriAdmin = "/admin"
+    22→)
+    23→
+    24→type okResp struct {
+    25→	Data any `json:"data"`
+    26→}
+    27→
+    28→var (
+    29→	reUUID = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+    30→)
+    31→
+    32→// registerHandlers registers HTTP handlers.
+    33→func initHTTPHandlers(e *echo.Echo, a *App) {
+    34→	// Default error handler.
+    35→	e.HTTPErrorHandler = func(err error, c echo.Context) {
+    36→		// Generic, non-echo error. Log it.
+    37→		if _, ok := err.(*echo.HTTPError); !ok {
+    38→			a.log.Println(err.Error())
+    39→		}
+    40→		e.DefaultHTTPErrorHandler(err, c)
+    41→	}
+    42→
+    43→	// =================================================================
+    44→	// Authenticated non /api handlers.
+    45→	{
+    46→		// Attach a middleware to the group that checks for auth.
+    47→		g := e.Group("", a.auth.Middleware, func(next echo.HandlerFunc) echo.HandlerFunc {
+    48→			return func(c echo.Context) error {
+    49→				u := c.Get(auth.UserHTTPCtxKey)
+    50→
+    51→				// On no-auth, redirect to login page
+    52→				if _, ok := u.(*echo.HTTPError); ok {
+    53→					u, _ := url.Parse(a.urlCfg.LoginURL)
+    54→					q := url.Values{}
+    55→					q.Set("next", c.Request().RequestURI)
+    56→					u.RawQuery = q.Encode()
+    57→					return c.Redirect(http.StatusTemporaryRedirect, u.String())
+    58→				}
+    59→
+    60→				return next(c)
+    61→			}
+    62→		})
+    63→
+    64→		// Authenticated endpoints.
+    65→		g.GET(path.Join(uriAdmin, ""), a.AdminPage)
+    66→		g.GET(path.Join(uriAdmin, "/custom.css"), serveCustomAppearance("admin.custom_css"))
+    67→		g.GET(path.Join(uriAdmin, "/custom.js"), serveCustomAppearance("admin.custom_js"))
+    68→		g.GET(path.Join(uriAdmin, "/*"), a.AdminPage)
+    69→	}
+    70→
+    71→	// =================================================================
+    72→	// Authenticated /api/* handlers.
+    73→	{
+    74→		var (
+    75→			// Permission check middleware.
+    76→			pm = a.auth.Perm
+    77→
+    78→			// Attach a middleware to the group that checks for auth.
+    79→			g = e.Group("", a.auth.Middleware, func(next echo.HandlerFunc) echo.HandlerFunc {
+    80→				return func(c echo.Context) error {
+    81→					u := c.Get(auth.UserHTTPCtxKey)
+    82→
+    83→					// On no-auth, respond with a JSON error.
+    84→					if err, ok := u.(*echo.HTTPError); ok {
+    85→						return err
+    86→					}
+    87→
+    88→					return next(c)
+    89→				}
+    90→			})
+    91→		)
+    92→
+    93→		// API endpoints.
+    94→		g.GET("/api/health", a.HealthCheck)
+    95→		g.GET("/api/config", a.GetServerConfig)
+    96→		g.GET("/api/lang/:lang", a.GetI18nLang)
+    97→		g.GET("/api/dashboard/charts", a.GetDashboardCharts)
+    98→		g.GET("/api/dashboard/counts", a.GetDashboardCounts)
+    99→
+   100→		g.GET("/api/settings", pm(a.GetSettings, "settings:get"))
+
+<system-reminder>
+Whenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.
+</system-reminder>
+
+isError: None
+2026-04-07 16:25:51.610 | Agent    | langchain_zast.agents.claude.agent:_log:249 - Now I have enough information about the structure of the endpoints. I can see that:
+- Routes are registered in handlers.go (main API endpoints) and init.go (static files)
+- The endpoints start around line 94 in handlers.go
+
+Let me now build the JSON structure. I'll create the JSON with all the endpoints I found. I need to extract:
+- endpoint
+- method
+- protocol (http)
+- region (file_path, start_line, end_line)
+
+Let me read more of the handlers.go file to understand more context.
+</think>
+
+
+
+2026-04-07 16:25:56.075 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: TodoWrite
+Args: {
+  "todos": [
+    {
+      "activeForm": "Creating progress file and initializing JSON",
+      "content": "Create progress file and initialize JSON",
+      "status": "completed"
+    },
+    {
+      "activeForm": "Parsing handlers.go for API endpoints",
+      "content": "Parse handlers.go for API endpoints",
+      "status": "in_progress"
+    },
+    {
+      "activeForm": "Parsing init.go for static routes",
+      "content": "Parse init.go for static routes",
+      "status": "pending"
+    },
+    {
+      "activeForm": "Validating JSON structure",
+      "content": "Validate JSON structure",
+      "status": "pending"
+    },
+    {
+      "activeForm": "Saving to controller_sources.json",
+      "content": "Save to controller_sources.json",
+      "status": "pending"
+    }
+  ]
+}
+2026-04-07 16:25:56.107 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable
+isError: None
+2026-04-07 16:25:58.779 | Agent    | langchain_zast.agents.claude.agent:_log:249 - Now let me continue reading handlers.go to see all the routes, and then parse init.go.
+</think>
+
+
+
+2026-04-07 16:26:00.286 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Grep
+Args: {
+  "pattern": "(GET|POST|PUT|DELETE|PATCH)\\s*\\(",
+  "path": "D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/cmd/handlers.go",
+  "output_mode": "content"
+}
+2026-04-07 16:26:00.351 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: 65:		g.GET(path.Join(uriAdmin, ""), a.AdminPage)
+66:		g.GET(path.Join(uriAdmin, "/custom.css"), serveCustomAppearance("admin.custom_css"))
+67:		g.GET(path.Join(uriAdmin, "/custom.js"), serveCustomAppearance("admin.custom_js"))
+68:		g.GET(path.Join(uriAdmin, "/*"), a.AdminPage)
+94:		g.GET("/api/health", a.HealthCheck)
+95:		g.GET("/api/config", a.GetServerConfig)
+96:		g.GET("/api/lang/:lang", a.GetI18nLang)
+97:		g.GET("/api/dashboard/charts", a.GetDashboardCharts)
+98:		g.GET("/api/dashboard/counts", a.GetDashboardCounts)
+100:		g.GET("/api/settings", pm(a.GetSettings, "settings:get"))
+101:		g.PUT("/api/settings", pm(a.UpdateSettings, "settings:manage"))
+102:		g.POST("/api/settings/smtp/test", pm(a.TestSMTPSettings, "settings:manage"))
+103:		g.POST("/api/admin/reload", pm(a.ReloadApp, "settings:manage"))
+104:		g.GET("/api/logs", pm(a.GetLogs, "settings:get"))
+105:		g.GET("/api/events", pm(a.EventStream, "settings:get"))
+106:		g.GET("/api/about", a.GetAboutInfo)
+108:		g.GET("/api/subscribers", pm(a.QuerySubscribers, "subscribers:get_all", "subscribers:get"))
+109:		g.GET("/api/subscribers/:id", pm(hasID(a.GetSubscriber), "subscribers:get_all", "subscribers:get"))
+110:		g.GET("/api/subscribers/:id/export", pm(hasID(a.ExportSubscriberData), "subscribers:get_all", "subscribers:get"))
+111:		g.GET("/api/subscribers/:id/bounces", pm(hasID(a.GetSubscriberBounces), "bounces:get"))
+112:		g.DELETE("/api/subscribers/:id/bounces", pm(hasID(a.DeleteSubscriberBounces), "bounces:manage"))
+113:		g.POST("/api/subscribers", pm(a.CreateSubscriber, "subscribers:manage"))
+114:		g.PUT("/api/subscribers/:id", pm(hasID(a.UpdateSubscriber), "subscribers:manage"))
+115:		g.POST("/api/subscribers/:id/optin", pm(hasID(a.SubscriberSendOptin), "subscribers:manage"))
+116:		g.PUT("/api/subscribers/blocklist", pm(a.BlocklistSubscribers, "subscribers:manage"))
+117:		g.PUT("/api/subscribers/:id/blocklist", pm(hasID(a.BlocklistSubscriber), "subscribers:manage"))
+118:		g.PUT("/api/subscribers/lists/:id", pm(a.ManageSubscriberLists, "subscribers:manage"))
+119:		g.PUT("/api/subscribers/lists", pm(a.ManageSubscriberLists, "subscribers:manage"))
+120:		g.DELETE("/api/subscribers/:id", pm(hasID(a.DeleteSubscriber), "subscribers:manage"))
+121:		g.DELETE("/api/subscribers", pm(a.DeleteSubscribers, "subscribers:manage"))
+123:		g.GET("/api/bounces", pm(a.GetBounces, "bounces:get"))
+124:		g.GET("/api/bounces/:id", pm(hasID(a.GetBounce), "bounces:get"))
+125:		g.DELETE("/api/bounces", pm(a.DeleteBounces, "bounces:manage"))
+126:		g.DELETE("/api/bounces/:id", pm(hasID(a.DeleteBounce), "bounces:manage"))
+130:		g.POST("/api/subscribers/query/delete", pm(a.DeleteSubscribersByQuery, "subscribers:manage"))
+131:		g.PUT("/api/subscribers/query/blocklist", pm(a.BlocklistSubscribersByQuery, "subscribers:manage"))
+132:		g.PUT("/api/subscribers/query/lists", pm(a.ManageSubscriberListsByQuery, "subscribers:manage"))
+133:		g.GET("/api/subscribers/export",
+136:		g.GET("/api/import/subscribers", pm(a.GetImportSubscribers, "subscribers:import"))
+137:		g.GET("/api/import/subscribers/logs", pm(a.GetImportSubscriberStats, "subscribers:import"))
+138:		g.POST("/api/import/subscribers", pm(a.ImportSubscribers, "subscribers:import"))
+139:		g.DELETE("/api/import/subscribers", pm(a.StopImportSubscribers, "subscribers:import"))
+142:		g.GET("/api/lists", a.GetLists)
+143:		g.GET("/api/lists/:id", hasID(a.GetList))
+144:		g.POST("/api/lists", pm(a.CreateList, "lists:manage_all"))
+145:		g.PUT("/api/lists/:id", hasID(a.UpdateList))
+146:		g.DELETE("/api/lists/:id", hasID(a.DeleteLists))
+148:		g.GET("/api/campaigns", pm(a.GetCampaigns, "campaigns:get_all", "campaigns:get"))
+149:		g.GET("/api/campaigns/running/stats", pm(a.GetRunningCampaignStats, "campaigns:get_all", "campaigns:get"))
+150:		g.GET("/api/campaigns/:id", pm(hasID(a.GetCampaign), "campaigns:get_all", "campaigns:get"))
+151:		g.GET("/api/campaigns/analytics/:type", pm(a.GetCampaignViewAnalytics, "campaigns:get_analytics"))
+152:		g.GET("/api/campaigns/:id/preview", pm(hasID(a.PreviewCampaign), "campaigns:get_all", "campaigns:get"))
+153:		g.POST("/api/campaigns/:id/preview/archive", pm(hasID(a.PreviewCampaignArchive), "campaigns:get_all", "campaigns:get"))
+154:		g.POST("/api/campaigns/:id/preview", pm(hasID(a.PreviewCampaign), "campaigns:get_all", "campaigns:get"))
+155:		g.POST("/api/campaigns/:id/content", pm(hasID(a.CampaignContent), "campaigns:manage_all", "campaigns:manage"))
+156:		g.POST("/api/campaigns/:id/text", pm(hasID(a.PreviewCampaign), "campaigns:get"))
+157:		g.POST("/api/campaigns/:id/test", pm(hasID(a.TestCampaign), "campaigns:manage_all", "campaigns:manage"))
+158:		g.POST("/api/campaigns", pm(a.CreateCampaign, "campaigns:manage_all", "campaigns:manage"))
+159:		g.PUT("/api/campaigns/:id", pm(hasID(a.UpdateCampaign), "campaigns:manage_all", "campaigns:manage"))
+160:		g.PUT("/api/campaigns/:id/status", pm(hasID(a.UpdateCampaignStatus), "campaigns:manage_all", "campaigns:manage"))
+161:		g.PUT("/api/campaigns/:id/archive", pm(hasID(a.UpdateCampaignArchive), "campaigns:manage_all", "campaigns:manage"))
+162:		g.DELETE("/api/campaigns/:id", pm(hasID(a.DeleteCampaign), "campaigns:manage_all", "campaigns:manage"))
+164:		g.GET("/api/media", pm(a.GetAllMedia, "media:get"))
+165:		g.GET("/api/media/:id", pm(hasID(a.GetMedia), "media:get"))
+166:		g.POST("/api/media", pm(a.UploadMedia, "media:manage"))
+167:		g.DELETE("/api/media/:id", pm(hasID(a.DeleteMedia), "media:manage"))
+169:		g.GET("/api/templates", pm(a.GetTemplates, "templates:get"))
+170:		g.GET("/api/templates/:id", pm(hasID(a.GetTemplate), "templates:get"))
+171:		g.GET("/api/templates/:id/preview", pm(hasID(a.PreviewTemplate), "templates:get"))
+172:		g.POST("/api/templates/preview", pm(a.PreviewTemplateBody, "templates:get"))
+173:		g.POST("/api/templates", pm(a.CreateTemplate, "templates:manage"))
+174:		g.PUT("/api/templates/:id", pm(hasID(a.UpdateTemplate), "templates:manage"))
+175:		g.PUT("/api/templates/:id/default", pm(hasID(a.TemplateSetDefault), "templates:manage"))
+176:		g.DELETE("/api/templates/:id", pm(hasID(a.DeleteTemplate), "templates:manage"))
+178:		g.DELETE("/api/maintenance/subscribers/:type", pm(a.GCSubscribers, "settings:maintain"))
+179:		g.DELETE("/api/maintenance/analytics/:type", pm(a.GCCampaignAnalytics, "settings:maintain"))
+180:		g.DELETE("/api/maintenance/subscriptions/unconfirmed", pm(a.GCSubscriptions, "settings:maintain"))
+182:		g.POST("/api/tx", pm(a.SendTxMessage, "tx:send"))
+184:		g.GET("/api/profile", a.GetUserProfile)
+185:		g.PUT("/api/profile", a.UpdateUserProfile)
+186:		g.GET("/api/users", pm(a.GetUsers, "users:get"))
+187:		g.GET("/api/users/:id", pm(hasID(a.GetUser), "users:get"))
+188:		g.POST("/api/users", pm(a.CreateUser, "users:manage"))
+189:		g.PUT("/api/users/:id", pm(hasID(a.UpdateUser), "users:manage"))
+190:		g.DELETE("/api/users", pm(a.DeleteUsers, "users:manage"))
+191:		g.DELETE("/api/users/:id", pm(hasID(a.DeleteUser), "users:manage"))
+192:		g.POST("/api/logout", a.Logout)
+194:		g.GET("/api/roles/users", pm(a.GetUserRoles, "roles:get"))
+195:		g.GET("/api/roles/lists", pm(a.GeListRoles, "roles:get"))
+196:		g.POST("/api/roles/users", pm(a.CreateUserRole, "roles:manage"))
+197:		g.POST("/api/roles/lists", pm(a.CreateListRole, "roles:manage"))
+198:		g.PUT("/api/roles/users/:id", pm(hasID(a.UpdateUserRole), "roles:manage"))
+199:		g.PUT("/api/roles/lists/:id", pm(hasID(a.UpdateListRole), "roles:manage"))
+200:		g.DELETE("/api/roles/:id", pm(hasID(a.DeleteRole), "roles:manage"))
+204:			g.POST("/webhooks/bounce", pm(a.BounceWebhook, "webhooks:post_bounce"))
+216:			g.POST("/webhooks/service/:service", a.BounceWebhook)
+220:		g.GET("/", func(c echo.Context) error {
+225:		g.GET(path.Join(uriAdmin, "/login"), a.LoginPage)
+226:		g.POST(path.Join(uriAdmin, "/login"), a.LoginPage)
+229:			g.POST("/auth/oidc", a.OIDCLogin)
+230:			g.GET("/auth/oidc", a.OIDCFinish)
+234:		g.GET("/api/public/lists", a.GetPublicLists)
+235:		g.POST("/api/public/subscription", a.PublicSubscription)
+237:			g.GET("/api/public/archive", a.GetCampaignArchives)
+242:		g.GET("/subscription/form", a.SubscriptionFormPage)
+243:		g.POST("/subscription/form", a.SubscriptionForm)
+244:		g.GET("/subscription/:campUUID/:subUUID", noIndex(a.hasUUID(a.hasSub(a.SubscriptionPage), "campUUID", "subUUID")))
+245:		g.POST("/subscription/:campUUID/:subUUID", a.hasUUID(a.hasSub(a.SubscriptionPrefs), "campUUID", "subUUID"))
+246:		g.GET("/subscription/optin/:subUUID", noIndex(a.hasUUID(a.hasSub(a.OptinPage), "subUUID")))
+247:		g.POST("/subscription/optin/:subUUID", a.hasUUID(a.hasSub(a.OptinPage), "subUUID"))
+248:		g.POST("/subscription/export/:subUUID", a.hasUUID(a.hasSub(a.SelfExportSubscriberData), "subUUID"))
+249:		g.POST("/subscription/wipe/:subUUID", a.hasUUID(a.hasSub(a.WipeSubscriberData), "subUUID"))
+250:		g.GET("/link/:linkUUID/:campUUID/:subUUID", noIndex(a.hasUUID(a.LinkRedirect, "linkUUID", "campUUID", "subUUID")))
+251:		g.GET("/campaign/:campUUID/:subUUID", noIndex(a.hasUUID(a.ViewCampaignMessage, "campUUID", "subUUID")))
+252:		g.GET("/campaign/:campUUID/:subUUID/px.png", noIndex(a.hasUUID(a.RegisterCampaignView, "campUUID", "subUUID")))
+255:			g.GET("/archive", a.CampaignArchivesPage)
+256:			g.GET("/archive.xml", a.GetCampaignArchivesFeed)
+257:			g.GET("/archive/:id", a.CampaignArchivePage)
+258:			g.GET("/archive/latest", a.CampaignArchivePageLatest)
+261:		g.GET("/public/custom.css", serveCustomAppearance("public.custom_css"))
+262:		g.GET("/public/custom.js", serveCustomAppearance("public.custom_js"))
+265:		g.GET("/health", a.HealthCheck)
+isError: None
+2026-04-07 16:26:04.405 | Agent    | langchain_zast.agents.claude.agent:_log:249 - Now I have all the endpoints from handlers.go. Let me also check init.go for static routes.
+</think>
+
+Now let me also check init.go for static routes:
+
+2026-04-07 16:26:05.877 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Grep
+Args: {
+  "output_mode": "content",
+  "path": "D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/cmd/init.go",
+  "pattern": "(GET|POST|PUT|DELETE|PATCH)\\s*\\("
+}
+2026-04-07 16:26:05.929 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: 876:	srv.GET("/public/static/*", echo.WrapHandler(fSrv))
+879:	srv.GET("/admin/static/*", echo.WrapHandler(fSrv))
+isError: None
+2026-04-07 16:26:09.789 | Agent    | langchain_zast.agents.claude.agent:_log:249 - Now let me create the JSON file with all the endpoints. I need to structure it properly. Let me also check if there are Any() or Match() calls.
+</think>
+
+Now let me build the complete JSON structure with all endpoints. I'll create the output file:
+
+2026-04-07 16:29:08.918 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Write
+Args: {
+  "file_path": "D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/.zast/llm-auditor/controller_sources.json",
+  "content": "[\n  {\n    \"endpoint\": \"/admin\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 65,\n      \"end_line\": 65\n    }\n  },\n  {\n    \"endpoint\": \"/admin/custom.css\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 66,\n      \"end_line\": 66\n    }\n  },\n  {\n    \"endpoint\": \"/admin/custom.js\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 67,\n      \"end_line\": 67\n    }\n  },\n  {\n    \"endpoint\": \"/admin/*\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 68,\n      \"end_line\": 68\n    }\n  },\n  {\n    \"endpoint\": \"/api/health\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 94,\n      \"end_line\": 94\n    }\n  },\n  {\n    \"endpoint\": \"/api/config\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 95,\n      \"end_line\": 95\n    }\n  },\n  {\n    \"endpoint\": \"/api/lang/:lang\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 96,\n      \"end_line\": 96\n    }\n  },\n  {\n    \"endpoint\": \"/api/dashboard/charts\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 97,\n      \"end_line\": 97\n    }\n  },\n  {\n    \"endpoint\": \"/api/dashboard/counts\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 98,\n      \"end_line\": 98\n    }\n  },\n  {\n    \"endpoint\": \"/api/settings\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 100,\n      \"end_line\": 100\n    }\n  },\n  {\n    \"endpoint\": \"/api/settings\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 101,\n      \"end_line\": 101\n    }\n  },\n  {\n    \"endpoint\": \"/api/settings/smtp/test\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 102,\n      \"end_line\": 102\n    }\n  },\n  {\n    \"endpoint\": \"/api/admin/reload\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 103,\n      \"end_line\": 103\n    }\n  },\n  {\n    \"endpoint\": \"/api/logs\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 104,\n      \"end_line\": 104\n    }\n  },\n  {\n    \"endpoint\": \"/api/events\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 105,\n      \"end_line\": 105\n    }\n  },\n  {\n    \"endpoint\": \"/api/about\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 106,\n      \"end_line\": 106\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 108,\n      \"end_line\": 108\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/:id\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 109,\n      \"end_line\": 109\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/:id/export\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 110,\n      \"end_line\": 110\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/:id/bounces\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 111,\n      \"end_line\": 111\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/:id/bounces\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 112,\n      \"end_line\": 112\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 113,\n      \"end_line\": 113\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/:id\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 114,\n      \"end_line\": 114\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/:id/optin\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 115,\n      \"end_line\": 115\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/blocklist\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 116,\n      \"end_line\": 116\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/:id/blocklist\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 117,\n      \"end_line\": 117\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/lists/:id\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 118,\n      \"end_line\": 118\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/lists\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 119,\n      \"end_line\": 119\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/:id\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 120,\n      \"end_line\": 120\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 121,\n      \"end_line\": 121\n    }\n  },\n  {\n    \"endpoint\": \"/api/bounces\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 123,\n      \"end_line\": 123\n    }\n  },\n  {\n    \"endpoint\": \"/api/bounces/:id\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 124,\n      \"end_line\": 124\n    }\n  },\n  {\n    \"endpoint\": \"/api/bounces\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 125,\n      \"end_line\": 125\n    }\n  },\n  {\n    \"endpoint\": \"/api/bounces/:id\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 126,\n      \"end_line\": 126\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/query/delete\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 130,\n      \"end_line\": 130\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/query/blocklist\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 131,\n      \"end_line\": 131\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/query/lists\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 132,\n      \"end_line\": 132\n    }\n  },\n  {\n    \"endpoint\": \"/api/subscribers/export\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 133,\n      \"end_line\": 133\n    }\n  },\n  {\n    \"endpoint\": \"/api/import/subscribers\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 136,\n      \"end_line\": 136\n    }\n  },\n  {\n    \"endpoint\": \"/api/import/subscribers/logs\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 137,\n      \"end_line\": 137\n    }\n  },\n  {\n    \"endpoint\": \"/api/import/subscribers\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 138,\n      \"end_line\": 138\n    }\n  },\n  {\n    \"endpoint\": \"/api/import/subscribers\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 139,\n      \"end_line\": 139\n    }\n  },\n  {\n    \"endpoint\": \"/api/lists\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 142,\n      \"end_line\": 142\n    }\n  },\n  {\n    \"endpoint\": \"/api/lists/:id\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 143,\n      \"end_line\": 143\n    }\n  },\n  {\n    \"endpoint\": \"/api/lists\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 144,\n      \"end_line\": 144\n    }\n  },\n  {\n    \"endpoint\": \"/api/lists/:id\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 145,\n      \"end_line\": 145\n    }\n  },\n  {\n    \"endpoint\": \"/api/lists/:id\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 146,\n      \"end_line\": 146\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 148,\n      \"end_line\": 148\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/running/stats\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 149,\n      \"end_line\": 149\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/:id\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 150,\n      \"end_line\": 150\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/analytics/:type\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 151,\n      \"end_line\": 151\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/:id/preview\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 152,\n      \"end_line\": 152\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/:id/preview/archive\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 153,\n      \"end_line\": 153\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/:id/preview\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 154,\n      \"end_line\": 154\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/:id/content\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 155,\n      \"end_line\": 155\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/:id/text\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 156,\n      \"end_line\": 156\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/:id/test\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 157,\n      \"end_line\": 157\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 158,\n      \"end_line\": 158\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/:id\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 159,\n      \"end_line\": 159\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/:id/status\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 160,\n      \"end_line\": 160\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/:id/archive\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 161,\n      \"end_line\": 161\n    }\n  },\n  {\n    \"endpoint\": \"/api/campaigns/:id\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 162,\n      \"end_line\": 162\n    }\n  },\n  {\n    \"endpoint\": \"/api/media\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 164,\n      \"end_line\": 164\n    }\n  },\n  {\n    \"endpoint\": \"/api/media/:id\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 165,\n      \"end_line\": 165\n    }\n  },\n  {\n    \"endpoint\": \"/api/media\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 166,\n      \"end_line\": 166\n    }\n  },\n  {\n    \"endpoint\": \"/api/media/:id\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 167,\n      \"end_line\": 167\n    }\n  },\n  {\n    \"endpoint\": \"/api/templates\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 169,\n      \"end_line\": 169\n    }\n  },\n  {\n    \"endpoint\": \"/api/templates/:id\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 170,\n      \"end_line\": 170\n    }\n  },\n  {\n    \"endpoint\": \"/api/templates/:id/preview\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 171,\n      \"end_line\": 171\n    }\n  },\n  {\n    \"endpoint\": \"/api/templates/preview\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 172,\n      \"end_line\": 172\n    }\n  },\n  {\n    \"endpoint\": \"/api/templates\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 173,\n      \"end_line\": 173\n    }\n  },\n  {\n    \"endpoint\": \"/api/templates/:id\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 174,\n      \"end_line\": 174\n    }\n  },\n  {\n    \"endpoint\": \"/api/templates/:id/default\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 175,\n      \"end_line\": 175\n    }\n  },\n  {\n    \"endpoint\": \"/api/templates/:id\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 176,\n      \"end_line\": 176\n    }\n  },\n  {\n    \"endpoint\": \"/api/maintenance/subscribers/:type\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 178,\n      \"end_line\": 178\n    }\n  },\n  {\n    \"endpoint\": \"/api/maintenance/analytics/:type\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 179,\n      \"end_line\": 179\n    }\n  },\n  {\n    \"endpoint\": \"/api/maintenance/subscriptions/unconfirmed\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 180,\n      \"end_line\": 180\n    }\n  },\n  {\n    \"endpoint\": \"/api/tx\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 182,\n      \"end_line\": 182\n    }\n  },\n  {\n    \"endpoint\": \"/api/profile\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 184,\n      \"end_line\": 184\n    }\n  },\n  {\n    \"endpoint\": \"/api/profile\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 185,\n      \"end_line\": 185\n    }\n  },\n  {\n    \"endpoint\": \"/api/users\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 186,\n      \"end_line\": 186\n    }\n  },\n  {\n    \"endpoint\": \"/api/users/:id\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 187,\n      \"end_line\": 187\n    }\n  },\n  {\n    \"endpoint\": \"/api/users\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 188,\n      \"end_line\": 188\n    }\n  },\n  {\n    \"endpoint\": \"/api/users/:id\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 189,\n      \"end_line\": 189\n    }\n  },\n  {\n    \"endpoint\": \"/api/users\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 190,\n      \"end_line\": 190\n    }\n  },\n  {\n    \"endpoint\": \"/api/users/:id\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 191,\n      \"end_line\": 191\n    }\n  },\n  {\n    \"endpoint\": \"/api/logout\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 192,\n      \"end_line\": 192\n    }\n  },\n  {\n    \"endpoint\": \"/api/roles/users\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 194,\n      \"end_line\": 194\n    }\n  },\n  {\n    \"endpoint\": \"/api/roles/lists\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 195,\n      \"end_line\": 195\n    }\n  },\n  {\n    \"endpoint\": \"/api/roles/users\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 196,\n      \"end_line\": 196\n    }\n  },\n  {\n    \"endpoint\": \"/api/roles/lists\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 197,\n      \"end_line\": 197\n    }\n  },\n  {\n    \"endpoint\": \"/api/roles/users/:id\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 198,\n      \"end_line\": 198\n    }\n  },\n  {\n    \"endpoint\": \"/api/roles/lists/:id\",\n    \"method\": \"PUT\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 199,\n      \"end_line\": 199\n    }\n  },\n  {\n    \"endpoint\": \"/api/roles/:id\",\n    \"method\": \"DELETE\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 200,\n      \"end_line\": 200\n    }\n  },\n  {\n    \"endpoint\": \"/webhooks/bounce\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 204,\n      \"end_line\": 204\n    }\n  },\n  {\n    \"endpoint\": \"/webhooks/service/:service\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 216,\n      \"end_line\": 216\n    }\n  },\n  {\n    \"endpoint\": \"/\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 220,\n      \"end_line\": 220\n    }\n  },\n  {\n    \"endpoint\": \"/admin/login\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 225,\n      \"end_line\": 225\n    }\n  },\n  {\n    \"endpoint\": \"/admin/login\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 226,\n      \"end_line\": 226\n    }\n  },\n  {\n    \"endpoint\": \"/auth/oidc\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 229,\n      \"end_line\": 229\n    }\n  },\n  {\n    \"endpoint\": \"/auth/oidc\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 230,\n      \"end_line\": 230\n    }\n  },\n  {\n    \"endpoint\": \"/api/public/lists\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 234,\n      \"end_line\": 234\n    }\n  },\n  {\n    \"endpoint\": \"/api/public/subscription\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 235,\n      \"end_line\": 235\n    }\n  },\n  {\n    \"endpoint\": \"/api/public/archive\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 237,\n      \"end_line\": 237\n    }\n  },\n  {\n    \"endpoint\": \"/subscription/form\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 242,\n      \"end_line\": 242\n    }\n  },\n  {\n    \"endpoint\": \"/subscription/form\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 243,\n      \"end_line\": 243\n    }\n  },\n  {\n    \"endpoint\": \"/subscription/:campUUID/:subUUID\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 244,\n      \"end_line\": 244\n    }\n  },\n  {\n    \"endpoint\": \"/subscription/:campUUID/:subUUID\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 245,\n      \"end_line\": 245\n    }\n  },\n  {\n    \"endpoint\": \"/subscription/optin/:subUUID\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 246,\n      \"end_line\": 246\n    }\n  },\n  {\n    \"endpoint\": \"/subscription/optin/:subUUID\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 247,\n      \"end_line\": 247\n    }\n  },\n  {\n    \"endpoint\": \"/subscription/export/:subUUID\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 248,\n      \"end_line\": 248\n    }\n  },\n  {\n    \"endpoint\": \"/subscription/wipe/:subUUID\",\n    \"method\": \"POST\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 249,\n      \"end_line\": 249\n    }\n  },\n  {\n    \"endpoint\": \"/link/:linkUUID/:campUUID/:subUUID\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 250,\n      \"end_line\": 250\n    }\n  },\n  {\n    \"endpoint\": \"/campaign/:campUUID/:subUUID\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 251,\n      \"end_line\": 251\n    }\n  },\n  {\n    \"endpoint\": \"/campaign/:campUUID/:subUUID/px.png\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 252,\n      \"end_line\": 252\n    }\n  },\n  {\n    \"endpoint\": \"/archive\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 255,\n      \"end_line\": 255\n    }\n  },\n  {\n    \"endpoint\": \"/archive.xml\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 256,\n      \"end_line\": 256\n    }\n  },\n  {\n    \"endpoint\": \"/archive/:id\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 257,\n      \"end_line\": 257\n    }\n  },\n  {\n    \"endpoint\": \"/archive/latest\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 258,\n      \"end_line\": 258\n    }\n  },\n  {\n    \"endpoint\": \"/public/custom.css\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 261,\n      \"end_line\": 261\n    }\n  },\n  {\n    \"endpoint\": \"/public/custom.js\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 262,\n      \"end_line\": 262\n    }\n  },\n  {\n    \"endpoint\": \"/health\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/handlers.go\",\n      \"start_line\": 265,\n      \"end_line\": 265\n    }\n  },\n  {\n    \"endpoint\": \"/public/static/*\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/init.go\",\n      \"start_line\": 876,\n      \"end_line\": 876\n    }\n  },\n  {\n    \"endpoint\": \"/admin/static/*\",\n    \"method\": \"GET\",\n    \"protocol\": \"http\",\n    \"region\": {\n      \"file_path\": \"cmd/init.go\",\n      \"start_line\": 879,\n      \"end_line\": 879\n    }\n  }\n]"
+}
+2026-04-07 16:29:09.013 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: File created successfully at: D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/.zast/llm-auditor/controller_sources.json
+isError: None
+2026-04-07 16:29:34.556 | Agent    | langchain_zast.agents.claude.agent:_log:249 - Now let me validate the JSON structure and update the todo list.
+</think>
+
+
+
+2026-04-07 16:29:41.422 | Agent    | langchain_zast.agents.claude.agent:_log:249 - <think>Now let me update the todo list and validate the JSON file.
+</think>
+
+
+
+2026-04-07 16:29:41.422 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: TodoWrite
+Args: {
+  "todos": [
+    {
+      "activeForm": "Creating progress file and initializing JSON",
+      "content": "Create progress file and initialize JSON",
+      "status": "completed"
+    },
+    {
+      "activeForm": "Parsing handlers.go for API endpoints",
+      "content": "Parse handlers.go for API endpoints",
+      "status": "completed"
+    },
+    {
+      "activeForm": "Parsing init.go for static routes",
+      "content": "Parse init.go for static routes",
+      "status": "completed"
+    },
+    {
+      "activeForm": "Validating JSON structure",
+      "content": "Validate JSON structure",
+      "status": "in_progress"
+    },
+    {
+      "activeForm": "Saving to controller_sources.json",
+      "content": "Save to controller_sources.json",
+      "status": "completed"
+    }
+  ]
+}
+2026-04-07 16:29:41.423 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable
+isError: None
+2026-04-07 16:30:11.944 | Agent    | langchain_zast.agents.claude.agent:_log:249 - Let me check if there's a validation script available.
+</think>
+
+
+
+2026-04-07 16:30:12.902 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Glob
+Args: {
+  "pattern": "D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/.claude/skills/enumerate-controllers/scripts/*"
+}
+2026-04-07 16:30:12.960 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/.claude/skills/enumerate-controllers/scripts\validate_controller_sources.py
+isError: None
+2026-04-07 16:30:51.577 | Agent    | langchain_zast.agents.claude.agent:_log:249 - Let me run the validation script.
+</think>
+
+Let me run the validation script:
+
+2026-04-07 16:30:56.598 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: Bash
+Args: {
+  "command": "python \"D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/.claude/skills/enumerate-controllers/scripts/validate_controller_sources.py\" \"D:/cvedetails/google-osv-api-go/go_sinks/sources/CWE-1336/CVE-2025-49136/.zast/llm-auditor/controller_sources.json\"",
+  "description": "Validate controller_sources.json"
+}
+2026-04-07 16:30:57.474 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: 🔍 Validating: D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\.zast\llm-auditor\controller_sources.json
+✅ Valid! 124 controller(s) found
+isError: False
+2026-04-07 16:31:33.770 | Agent    | langchain_zast.agents.claude.agent:_log:249 - The validation passed. Let me update the todo list to mark all tasks as completed.
+</think>
+
+
+
+2026-04-07 16:31:45.797 | ToolUse  | langchain_zast.agents.claude.agent:_log:249 - ToolUse: TodoWrite
+Args: {
+  "todos": [
+    {
+      "activeForm": "Creating progress file and initializing JSON",
+      "content": "Create progress file and initialize JSON",
+      "status": "completed"
+    },
+    {
+      "activeForm": "Parsing handlers.go for API endpoints",
+      "content": "Parse handlers.go for API endpoints",
+      "status": "completed"
+    },
+    {
+      "activeForm": "Parsing init.go for static routes",
+      "content": "Parse init.go for static routes",
+      "status": "completed"
+    },
+    {
+      "activeForm": "Validating JSON structure",
+      "content": "Validate JSON structure",
+      "status": "completed"
+    },
+    {
+      "activeForm": "Saving to controller_sources.json",
+      "content": "Save to controller_sources.json",
+      "status": "completed"
+    }
+  ]
+}
+2026-04-07 16:31:45.819 | ToolRes  | langchain_zast.agents.claude.agent:_log:249 - ToolResult: Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable
+isError: None
+2026-04-07 16:32:31.657 | Agent    | langchain_zast.agents.claude.agent:_log:249 - <think>The enumeration is complete. Let me summarize the results to the user.
+</think>
+
+## ✅ Controller Enumeration Complete
+
+**Total endpoints extracted:** 124
+
+**Output file saved to:** `D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\.zast\llm-auditor\controller_sources.json`
+
+**Project framework:** Echo (Go) - `github.com/labstack/echo/v4`
+
+**Files scanned:**
+- `cmd/handlers.go` - Main API endpoints (122 routes)
+- `cmd/init.go` - Static file routes (2 routes)
+
+**Endpoint summary:**
+| Category | Count |
+|----------|-------|
+| Admin pages | 4 |
+| API endpoints (/api/*) | 82 |
+| Public endpoints | 20 |
+| Webhooks | 2 |
+| Static routes | 2 |
+| Health checks | 2 |
+2026-04-07 16:32:31.661 | INFO     | langchain_zast.agents.claude.agent:_log:249 - <think>The enumeration is complete. Let me summarize the results to the user.
+</think>
+
+## ✅ Controller Enumeration Complete
+
+**Total endpoints extracted:** 124
+
+**Output file saved to:** `D:\cvedetails\google-osv-api-go\go_sinks\sources\CWE-1336\CVE-2025-49136\.zast\llm-auditor\controller_sources.json`
+
+**Project framework:** Echo (Go) - `github.com/labstack/echo/v4`
+
+**Files scanned:**
+- `cmd/handlers.go` - Main API endpoints (122 routes)
+- `cmd/init.go` - Static file routes (2 routes)
+
+**Endpoint summary:**
+| Category | Count |
+|----------|-------|
+| Admin pages | 4 |
+| API endpoints (/api/*) | 82 |
+| Public endpoints | 20 |
+| Webhooks | 2 |
+| Static routes | 2 |
+| Health checks | 2 |
+2026-04-07 16:32:31.661 | INFO     | langchain_zast.agents.claude.agent:_log:249 - {
+  "subtype": "success",
+  "duration_ms": 449244,
+  "duration_api_ms": 447631,
+  "is_error": false,
+  "num_turns": 20,
+  "session_id": "08ef33fa-95ed-49b9-b0f8-3170d583cfd1",
+  "stop_reason": "end_turn",
+  "total_cost_usd": 3.52415,
+  "usage": {
+    "input_tokens": 526499,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 9919,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 0,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [],
+    "speed": "standard"
+  },
+  "structured_output": null
+}
+2026-04-07 16:32:31.726 | INFO     | llm_auditor.tasks.enumerate_controllers:_enumerate_controllers:79 - Found 124 controllers
